@@ -22,6 +22,7 @@ See `notebooks/01_eda.ipynb` for more details on the data and valid cleaning ste
 ## 🔨 Setup
 
 - Copy `vitals_raw.txt` to `data/vitals_raw.txt`
+- Create a `.env` file based on `.env.example`.
 - Install `uv` (see [installation instructions](https://docs.astral.sh/uv/getting-started/installation/))
 - Run `uv sync` to install dependencies
 - Activate the virtual environment with `source .venv/bin/activate` (MacOS/Linux) or `.venv\Scripts\activate` (Windows)
@@ -31,3 +32,5 @@ See `notebooks/01_eda.ipynb` for more details on the data and valid cleaning ste
 > Use `make` to run commands defined in the `Makefile`.
 
 - Ingest and clean data: `make ingest_data`
+- Run emulator: `make start_emulator`
+- Load cleaned data into Bigtable: `make load_bigtable`
