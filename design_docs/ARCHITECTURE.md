@@ -32,3 +32,40 @@ Therefore, the row key is structured as `{sensor_id}#{YYYY-MM-DDTHH}` (time buck
 **Hotspot Prevention:** By bucketing data into hourly intervals, we ensure that queries for the last hour only need to read at most two rows (current hour and previous hour), which prevents hotspots and ensures low-latency access.
 
 **Cell Families:** Separating vitals and metadata into different column families allows for more efficient storage and retrieval, as queries that only need vitals can ignore the metadata columns, and vice versa.
+
+# BigQuery Analytics Layer
+
+BQ serves as our long-term analytics warehouse.
+
+## Schema
+
+The BigQuery table is a flat, denormalized representation — one row per sensor reading — which is the natural shape for SQL analytics and avoids the need for `UNNEST` operations.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `event_timestamp` | `TIMESTAMP` | Converted from Unix ms; partition key |
+| `sensor_id` | `STRING` | Clustering key |
+| `heart_rate` | `FLOAT64` | bpm |
+| `body_temperature` | `FLOAT64` | °C |
+| `spO2` | `INT64` | % |
+| `battery_level` | `INT64` | % |
+| `heart_rate_imputed` | `BOOL` | Data lineage flag |
+
+## Sustained Alerts Query
+
+The analytical query in `sql/analytical_query.sql` detects sensors where `body_temperature > 40 °C` for **3 or more consecutive readings** using a gaps-and-islands technique. Two `ROW_NUMBER()` sequences are computed per sensor: one over all readings, one over only the hot readings. Their difference stays constant for consecutive hot readings, forming a natural `streak_id`. Grouping by `(sensor_id, streak_id)` and filtering to length >= 3 yields the sustained alerts.
+
+## Optimizing for 1 Petabyte
+
+At petabyte scale this table would span years of data across thousands of ICU monitors. The two most impactful optimisations are **partitioning** and **clustering**.
+
+**Partition Key `event_timestamp` (DAY):** Most analytical queries include a time-range predicate (e.g. "last 30 days"). Day-level partitioning lets BigQuery prune entire days from the scan, eliminating terabytes of I/O before the query engine starts. Day granularity is the right trade-off — hourly would exceed BigQuery's partition limits (4,000 for ingestion-time, 10,000 for column-based) over years of data, while monthly would be too coarse.
+
+**Clustering on `sensor_id`:** Nearly every query filters or groups by sensor. Clustering co-locates data for the same sensor within each partition, so a query for "sensor X in the last 7 days" reads only the relevant blocks instead of scanning entire day partitions.
+
+**Clustering on `body_temperature`:** As a secondary clustering column, BigQuery can skip blocks where the temperature range doesn't overlap threshold predicates like `body_temperature > 40` — effectively a lightweight index for alert-type queries.
+
+**Additional considerations at scale:**
+- **Materialized Views** for pre-aggregated alert metrics (e.g. hourly max temperature per sensor) to avoid re-scanning raw data.
+- **BI Engine Reservation** to cache frequently-accessed partitions in memory for sub-second dashboard responses.
+- **Storage Lifecycle Policies** — data untouched for 90 days automatically drops to ~50% of the active storage cost, significant at petabyte scale.

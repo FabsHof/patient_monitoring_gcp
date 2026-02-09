@@ -34,3 +34,4 @@ See `notebooks/01_eda.ipynb` for more details on the data and valid cleaning ste
 - Ingest and clean data: `make ingest_data`
 - Run emulator: `make start_emulator`
 - Load cleaned data into Bigtable: `make load_bigtable`
+- Load cleaned data into BigQuery: `make bigquery_load`
