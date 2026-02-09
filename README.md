@@ -26,3 +26,8 @@ See `notebooks/01_eda.ipynb` for more details on the data and valid cleaning ste
 - Run `uv sync` to install dependencies
 - Activate the virtual environment with `source .venv/bin/activate` (MacOS/Linux) or `.venv\Scripts\activate` (Windows)
 
+## 🚀 Commands
+
+> Use `make` to run commands defined in the `Makefile`.
+
+- Ingest and clean data: `make ingest_data`
