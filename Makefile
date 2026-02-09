@@ -1,4 +1,4 @@
-.PHONY: ingest_data run_emulator bigtable_load
+.PHONY: ingest_data run_emulator bigtable_load bigquery_load
 
 ingest_data:
 	@echo "Starting data ingestion and cleaning process..."
@@ -14,3 +14,8 @@ bigtable_load:
 	@echo "Loading cleaned data into Bigtable emulator..."
 	@python code/bigtable_load.py
 	@echo "Bigtable load completed."
+
+bigquery_load:
+	@echo "Loading cleaned data into BigQuery..."
+	@python code/bigquery_load.py
+	@echo "BigQuery load completed."
