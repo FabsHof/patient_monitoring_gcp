@@ -69,3 +69,29 @@ At petabyte scale this table would span years of data across thousands of ICU mo
 - **Materialized Views** for pre-aggregated alert metrics (e.g. hourly max temperature per sensor) to avoid re-scanning raw data.
 - **BI Engine Reservation** to cache frequently-accessed partitions in memory for sub-second dashboard responses.
 - **Storage Lifecycle Policies** — data untouched for 90 days automatically drops to ~50% of the active storage cost, significant at petabyte scale.
+
+# Vertex AI Pipeline
+
+The pipeline in `code/vertex_pipeline.py` automates the path from data to deployed model. It uses KFP v2 (`@dsl.component` / `@dsl.pipeline`) compiled to YAML for execution on Vertex AI Pipelines.
+
+**Pipeline steps:** Ingest from BQ (derive `septic_risk` label) ==> Train dummy sklearn `LogisticRegression` ==> Register model in Vertex AI Model Registry ==> Deploy to Vertex AI Endpoint.
+
+**Label derivation:** A binary `septic_risk` flag is computed in the ingestion query: `body_temperature > 38.5 AND heart_rate > 100`. This is a placeholder — a production model would use clinically validated SIRS/qSOFA criteria and richer features.
+
+**Serving container:** The pipeline uses Google's pre-built `sklearn-cpu` serving image, which handles model loading and REST inference out of the box.
+
+## Model Drift Feedback Loop
+
+If model drift detection triggers an alert in production, the following automated steps should execute:
+
+**1. Detect:** Vertex AI Model Monitoring continuously compares incoming prediction request distributions against the training baseline. Feature drift is measured via Jensen-Shannon divergence; prediction drift via distribution shift on model outputs. Thresholds are configured per feature (e.g. `body_temperature` distribution shift > 0.1).
+
+**2. Alert:** When drift exceeds a threshold, Cloud Monitoring fires a notification to a Pub/Sub topic (`model-drift-alerts`). This decouples detection from action and allows multiple subscribers.
+
+**3. Retrain:** A Cloud Function subscribed to the drift topic re-submits the Vertex AI pipeline with a fresh BigQuery window (e.g. last 30 days). The pipeline runs the same Ingest ==> Train ==> Register steps, producing a candidate model.
+
+**4. Validate:** The candidate model's metrics (AUC, precision, recall) are compared against the current production model using a hold-out evaluation set. Only if the candidate outperforms the champion is it promoted — this is a champion/challenger gate that prevents regressions.
+
+**5. Deploy:** The pipeline updates the existing Endpoint's traffic split to route 100% to the new model version (blue-green swap). Alternatively, a canary rollout (e.g. 10% ==> 50% ==> 100%) can be used for higher-risk deployments.
+
+**6. Log:** All retraining events, model versions, evaluation metrics, and drift scores are tracked in Vertex AI Experiments. This provides a full audit trail linking each deployed model back to the drift signal that triggered its retraining.

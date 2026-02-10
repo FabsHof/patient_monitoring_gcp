@@ -1,4 +1,4 @@
-.PHONY: ingest_data run_emulator bigtable_load bigquery_load
+.PHONY: ingest_data run_emulator bigtable_load bigquery_load vertex_pipeline all
 
 ingest_data:
 	@echo "Starting data ingestion and cleaning process..."
@@ -19,3 +19,10 @@ bigquery_load:
 	@echo "Loading cleaned data into BigQuery..."
 	@python code/bigquery_load.py
 	@echo "BigQuery load completed."
+
+vertex_pipeline:
+	@echo "Compiling Vertex AI pipeline (dry run)..."
+	@python code/vertex_pipeline.py
+	@echo "Pipeline compilation completed."
+
+all: ingest_data run_emulator bigtable_load bigquery_load vertex_pipeline
