@@ -3,8 +3,8 @@ Load cleaned sensors data into Cloud Bigtable.
 
 Schema: Time-bucketed rows with cell versioning
   Row Key:    {sensor_id}#{YYYY-MM-DDTHH}   (UTC hour bucket)
-  Families:   vitals  → heart_rate, body_temperature, spO2
-              meta    → battery_level, heart_rate_imputed
+  Families:   vitals  ==> heart_rate, body_temperature, spO2
+              meta    ==> battery_level, heart_rate_imputed
 
 Each sensor event is stored as a new cell version (keyed by its event
 timestamp) inside the row for that sensor's hour bucket.  This means one
@@ -95,7 +95,7 @@ def load_data(table, data_path: str) -> int:
         key = make_row_key(rec['sensor_id'], rec['event_timestamp'])
         grouped[key].append(rec)
 
-    print(f'{len(records)} events → {len(grouped)} rows')
+    print(f'{len(records)} events ==> {len(grouped)} rows')
 
     batch = []
     for row_key, events in grouped.items():

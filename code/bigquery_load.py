@@ -122,22 +122,27 @@ def load_data(client: bigquery.Client, table: bigquery.Table, rows: list[dict]) 
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    print('1) Connecting to BigQuery ...')
-    client = bigquery.Client(project=PROJECT_ID)
+    try:
+        print('1) Connecting to BigQuery ...')
+        client = bigquery.Client(project=PROJECT_ID)
 
-    print('2) Ensuring dataset exists ...')
-    ensure_dataset(client)
+        print('2) Ensuring dataset exists ...')
+        ensure_dataset(client)
 
-    print('3) Creating table ...')
-    table = create_table(client)
+        print('3) Creating table ...')
+        table = create_table(client)
 
-    print('4) Reading cleaned data ...')
-    data_file = join(dirname(__file__), '..', 'data', 'vitals_cleaned.jsonl')
-    rows = _read_jsonl(data_file)
-    print(f'   {len(rows)} records read.')
+        print('4) Reading cleaned data ...')
+        data_file = join(dirname(__file__), '..', 'data', 'vitals_cleaned.jsonl')
+        rows = _read_jsonl(data_file)
+        print(f'   {len(rows)} records read.')
 
-    print('5) Loading into BigQuery ...')
-    load_data(client, table, rows)
+        print('5) Loading into BigQuery ...')
+        load_data(client, table, rows)
 
-    print('\nDone. Run analytical queries in the BigQuery console or via')
-    print(f'  bq query --use_legacy_sql=false < sql/analytical_query.sql')
+        print('\nDone. Run analytical queries in the BigQuery console or via')
+        print(f'  bq query --use_legacy_sql=false < sql/analytical_query.sql')
+
+    except Exception as e:
+        print(f'⚠️ Skipped PipelineJob creation — no GCP credentials:\n\n{e}\n\n')
+        print('Hint: To authenticate, run: gcloud auth application-default login')
