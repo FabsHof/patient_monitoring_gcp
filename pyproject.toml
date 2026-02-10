@@ -1,6 +1,6 @@
 [project]
-name = "gcp-sensors"
-version = "0.1.0"
+name = "patient_monitoring_gcp"
+version = "0.4.4"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
