@@ -243,7 +243,7 @@ deploymentSpec:
           \ output_model.path)\n\n"
         image: python:3.11
 pipelineInfo:
-  description: "Ingest from BQ \u2192 Train \u2192 Register \u2192 Deploy"
+  description: Ingest from BQ ==> Train ==> Register ==> Deploy
   name: septic-shock-risk-pipeline
 root:
   dag:
