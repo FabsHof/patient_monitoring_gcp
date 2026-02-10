@@ -1,4 +1,4 @@
-.PHONY: ingest_data run_emulator bigtable_load bigquery_load vertex_pipeline all
+.PHONY: ingest_data run_emulator load_bigtable load_bigquery vertex_pipeline all
 
 ingest_data:
 	@python code/ingest.py
@@ -6,13 +6,13 @@ ingest_data:
 run_emulator:
 	@docker compose up -d
 
-bigtable_load:
+load_bigtable:
 	@python code/bigtable_load.py
 
-bigquery_load:
+load_bigquery:
 	@python code/bigquery_load.py
 
 vertex_pipeline:
 	@python code/vertex_pipeline.py
 
-all: ingest_data run_emulator bigtable_load bigquery_load vertex_pipeline
+all: ingest_data run_emulator load_bigtable load_bigquery vertex_pipeline
