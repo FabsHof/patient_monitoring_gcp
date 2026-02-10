@@ -20,9 +20,24 @@ def ingest_and_clean_data(file_path=None):
     # Load the dataset
     data = pd.read_json(data_path, lines=True)
 
-    # Parse the timestamp column to datetime, filtering out invalid entries
-    data['event_timestamp'] = pd.to_datetime(data['event_timestamp'], errors='coerce')
-    data = data[~data['event_timestamp'].isna()]
+    # Parse the timestamp column to datetime
+    ts = data['event_timestamp']
+    if pd.api.types.is_numeric_dtype(ts):
+        parsed_ts = pd.to_datetime(ts, unit='ms', errors='coerce', utc=True)
+    else:
+        parsed_ts = pd.to_datetime(ts, errors='coerce', utc=True)
+
+    # Filter out invalid and future timestamps
+    now_utc = pd.Timestamp.now('UTC')
+    parsed_ts = parsed_ts[~parsed_ts.isna()]
+    parsed_ts = parsed_ts[parsed_ts <= now_utc]
+    data = data.loc[parsed_ts.index]
+
+    # Normalize to Unix milliseconds for downstream loaders
+    ts_unit = getattr(parsed_ts.dtype, 'unit', 'ns')
+    unit_to_divisor = {'ns': 1_000_000, 'us': 1_000, 'ms': 1}
+    divisor = unit_to_divisor.get(ts_unit, 1_000_000)
+    data['event_timestamp'] = (parsed_ts.astype('int64') // divisor).astype('int64')
 
     # Clamp body temperature values to a reasonable range (27-42.6 degrees Celsius)
     data['body_temperature'] = data['body_temperature'].clip(lower=27, upper=42.6)
