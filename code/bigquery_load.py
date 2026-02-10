@@ -21,6 +21,7 @@ from os.path import join, dirname
 
 from google.cloud import bigquery
 from dotenv import load_dotenv, dotenv_values
+from log import log, substep
 
 load_dotenv()
 
@@ -76,7 +77,6 @@ def ensure_dataset(client: bigquery.Client) -> bigquery.Dataset:
     dataset = bigquery.Dataset(dataset_ref)
     dataset.location = 'US'
     dataset = client.create_dataset(dataset, exists_ok=True)
-    print(f'Dataset "{BQ_DATASET}" ready.')
     return dataset
 
 
@@ -93,7 +93,6 @@ def create_table(client: bigquery.Client) -> bigquery.Table:
 
     client.delete_table(table_ref, not_found_ok=True)
     table = client.create_table(table)
-    print(f'Created table "{table_ref}" (partitioned by DAY, clustered by sensor_id).')
     return table
 
 
@@ -113,7 +112,6 @@ def load_data(client: bigquery.Client, table: bigquery.Table, rows: list[dict]) 
     job.result()  # block until complete
 
     dest = client.get_table(table)
-    print(f'Loaded {dest.num_rows} rows into {dest.full_table_id}.')
     return dest.num_rows
 
 
@@ -123,26 +121,27 @@ def load_data(client: bigquery.Client, table: bigquery.Table, rows: list[dict]) 
 
 if __name__ == '__main__':
     try:
-        print('1) Connecting to BigQuery ...')
+        log('Connecting to BigQuery ...')
         client = bigquery.Client(project=PROJECT_ID)
 
-        print('2) Ensuring dataset exists ...')
+        log('Ensuring dataset exists ...')
         ensure_dataset(client)
+        substep(1, f'Dataset "{BQ_DATASET}" ready')
 
-        print('3) Creating table ...')
+        log('Creating table ...')
+        table_ref = f'{PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}'
         table = create_table(client)
+        substep(2, f'Created table "{table_ref}" (partitioned by DAY, clustered by sensor_id)')
 
-        print('4) Reading cleaned data ...')
+        log('Reading cleaned data ...')
         data_file = join(dirname(__file__), '..', 'data', 'vitals_cleaned.jsonl')
         rows = _read_jsonl(data_file)
-        print(f'   {len(rows)} records read.')
+        substep(3, f'{len(rows)} records read')
 
-        print('5) Loading into BigQuery ...')
-        load_data(client, table, rows)
-
-        print('\nDone. Run analytical queries in the BigQuery console or via')
-        print(f'  bq query --use_legacy_sql=false < sql/analytical_query.sql')
+        log('Loading into BigQuery ...')
+        num_rows = load_data(client, table, rows)
+        substep(4, f'Loaded {num_rows} rows into {table.full_table_id}')
 
     except Exception as e:
-        print(f'⚠️ Skipped PipelineJob creation — no GCP credentials:\n\n{e}\n\n')
-        print('Hint: To authenticate, run: gcloud auth application-default login')
+        log(f'Skipped — no GCP credentials: {e}')
+        substep(1, 'Run: gcloud auth application-default login')

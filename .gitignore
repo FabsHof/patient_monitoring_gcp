@@ -210,3 +210,5 @@ __marimo__/
 .history/
 data/*
 !data/.gitkeep
+logs/*
+!logs/.gitkeep

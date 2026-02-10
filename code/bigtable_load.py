@@ -23,6 +23,8 @@ from google.cloud.bigtable import row_filters
 from google.cloud.bigtable import column_family
 
 from dotenv import load_dotenv, dotenv_values
+from log import log, substep
+
 load_dotenv()
 
 env = dotenv_values()
@@ -39,7 +41,7 @@ CF_META = 'meta'
 
 def get_client():
     """Return Bigtable admin client, defaulting to local emulator."""
-    
+
     os.environ.setdefault('BIGTABLE_EMULATOR_HOST', env.get('BIGTABLE_EMULATOR_HOST', 'localhost:8086'))
     return bigtable.Client(project=PROJECT_ID, admin=True)
 
@@ -53,14 +55,12 @@ def create_table(instance):
     table = instance.table(TABLE_ID)
 
     if table.exists():
-        print('table already exists — dropping first.')
         table.delete()
 
     # Hot-storage window: auto-GC cells older than 7 days
     gc_rule = column_family.MaxAgeGCRule(datetime.timedelta(days=7))
 
     table.create(column_families={CF_VITALS: gc_rule, CF_META: gc_rule})
-    print(f'Created table "{TABLE_ID}" [{CF_VITALS}, {CF_META}]')
     return table
 
 
@@ -84,7 +84,7 @@ def _ts_to_dt(ms: int) -> datetime.datetime:
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_data(table, data_path: str) -> int:
+def load_data(table, data_path: str) -> tuple[int, int]:
     """Load cleaned JSONL into Bigtable using cell versioning."""
     with open(data_path) as f:
         records = [json.loads(line) for line in f]
@@ -94,8 +94,6 @@ def load_data(table, data_path: str) -> int:
     for rec in records:
         key = make_row_key(rec['sensor_id'], rec['event_timestamp'])
         grouped[key].append(rec)
-
-    print(f'{len(records)} events ==> {len(grouped)} rows')
 
     batch = []
     for row_key, events in grouped.items():
@@ -116,8 +114,7 @@ def load_data(table, data_path: str) -> int:
     if batch:
         table.mutate_rows(batch)
 
-    print(f'Loaded successfully.')
-    return len(records)
+    return len(records), len(grouped)
 
 
 # ---------------------------------------------------------------------------
@@ -169,16 +166,18 @@ def query_patient_vitals(table, sensor_id: str, reference_time_ms: int):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    print('1) Connecting to Bigtable emulator ...')
+    log('Connecting to Bigtable emulator ...')
     client = get_client()
     instance = client.instance(INSTANCE_ID)
 
-    print('2) Creating table ...')
+    log('Creating table ...')
     table = create_table(instance)
+    substep(1, f'Created table "{TABLE_ID}" [{CF_VITALS}, {CF_META}]')
 
-    print('3) Loading cleaned data ...')
+    log('Loading cleaned data ...')
     data_file = join(dirname(__file__), '..', 'data', 'vitals_cleaned.jsonl')
-    load_data(table, data_file)
+    event_count, row_count = load_data(table, data_file)
+    substep(2, f'{event_count} events ==> {row_count} rows')
 
     # --- demo query ---
     with open(data_file) as f:
@@ -187,10 +186,10 @@ if __name__ == '__main__':
     demo_sensor = first['sensor_id']
     demo_ref = first['event_timestamp'] + 3_600_000  # 1 h after first event
 
-    print(f'\n4) Demo query: vitals for "{demo_sensor}", 1 h before {_ts_to_dt(demo_ref).isoformat()}')
+    log(f'Demo query: vitals for "{demo_sensor}", 1 h before {_ts_to_dt(demo_ref).isoformat()}')
     rows = query_patient_vitals(table, demo_sensor, demo_ref)
-    print(f'{len(rows)} readings')
+    substep(3, f'{len(rows)} readings returned')
     for r in rows[:5]:
-        print(f'{r["timestamp"]}  hr={r["heart_rate"]}  bt={r["body_temperature"]}  spO2={r["spO2"]}')
+        substep(4, f'{r["timestamp"]}  hr={r["heart_rate"]}  bt={r["body_temperature"]}  spO2={r["spO2"]}')
     if len(rows) > 5:
-        print(f'and {len(rows) - 5} more')
+        substep(5, f'... and {len(rows) - 5} more')

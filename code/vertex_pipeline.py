@@ -16,6 +16,7 @@ from kfp.dsl import Dataset, Model, Input, Output
 from google.cloud import aiplatform
 
 from dotenv import load_dotenv, dotenv_values
+from log import log, substep
 
 load_dotenv()
 
@@ -223,15 +224,15 @@ def septic_risk_pipeline(
 if __name__ == '__main__':
     output_path = 'septic_risk_pipeline.yaml'
 
-    print('1) Compiling pipeline ...')
+    log('Compiling pipeline ...')
     compiler.Compiler().compile(
         pipeline_func=septic_risk_pipeline,
         package_path=output_path,
     )
-    print(f'   Pipeline compiled ==> {output_path}')
+    substep(1, f'Pipeline compiled ==> {output_path}')
 
     try:
-        print('2) Creating PipelineJob (dry run — not submitted) ...')
+        log('Creating PipelineJob (dry run — not submitted) ...')
         job = aiplatform.PipelineJob(
             display_name='septic-risk-pipeline-run',
             template_path=output_path,
@@ -243,9 +244,9 @@ if __name__ == '__main__':
                 'bq_table': BQ_TABLE,
             },
         )
-        print(f'   PipelineJob ready: {job.display_name}')
-        print(f'   To submit: job.run(service_account="<SA_EMAIL>")')
+        substep(2, f'PipelineJob ready: {job.display_name}')
+        substep(3, f'To submit: job.run(service_account="<SA_EMAIL>")')
 
     except Exception as e:
-        print(f'⚠️ Skipped PipelineJob creation — no GCP credentials:\n\n{e}\n\n')
-        print('Hint: To authenticate, run: gcloud auth application-default login')
+        log(f'Skipped PipelineJob creation — no GCP credentials: {e}')
+        substep(1, 'Run: gcloud auth application-default login')

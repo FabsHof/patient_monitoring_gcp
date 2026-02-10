@@ -2,13 +2,16 @@ import pandas as pd
 import os
 from os.path import join, dirname
 
+from log import log, substep
+
+
 def ingest_and_clean_data(file_path=None):
     """
     Ingests raw data from a specified file path, performs cleaning operations, and saves the cleaned dataset.
     Args:
         file_path (str): Path to the raw data file.
     Returns:
-        str: Path to the cleaned data file.
+        tuple: (output_path, row_count, imputed_count)
     """
     data_path = file_path
     if data_path is None or not os.path.isfile(data_path):
@@ -38,15 +41,14 @@ def ingest_and_clean_data(file_path=None):
     output_path = join(dirname(data_path), 'vitals_cleaned.jsonl')
     data.to_json(output_path, orient='records', lines=True)
 
-    # Quick audit
-    print('> Cleaned rows:', len(data))
-    print('> Imputed heart rate rows:', data['heart_rate_imputed'].sum())
-    print('> Output path:', output_path)
-
-    return output_path
+    return output_path, len(data), int(data['heart_rate_imputed'].sum())
 
 
 if __name__ == '__main__':
+    log('Ingesting and cleaning raw data ...')
     file_path = join('data', 'vitals_raw.txt')
-    output_path = ingest_and_clean_data(file_path)
-    print('Cleaned data saved to:', output_path)
+    output_path, row_count, imputed_count = ingest_and_clean_data(file_path)
+
+    substep(1, f'Cleaned rows: {row_count}')
+    substep(2, f'Imputed heart rate rows: {imputed_count}')
+    substep(3, f'Output path: {output_path}')
